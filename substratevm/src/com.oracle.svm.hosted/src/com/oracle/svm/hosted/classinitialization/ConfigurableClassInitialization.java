@@ -580,20 +580,6 @@ public class ConfigurableClassInitialization implements ClassInitializationSuppo
             return existing;
         }
 
-        /* Initialize all annotations because we don't support parsing at run-time. */
-        if (clazz.isAnnotation()) {
-            forceInitializeHosted(clazz, "all annotations are initialized", false);
-            return InitKind.BUILD_TIME;
-        }
-
-        /* Well, and enums that got initialized while annotations are parsed. */
-        if (clazz.isEnum() && !GraalUnsafeAccess.shouldBeInitialized(clazz)) {
-            if (memoize) {
-                forceInitializeHosted(clazz, "enums referred in annotations must be initialized", false);
-            }
-            return InitKind.BUILD_TIME;
-        }
-
         if (clazz.isPrimitive()) {
             forceInitializeHosted(clazz, "primitive types are initialized at build time", false);
             return InitKind.BUILD_TIME;
