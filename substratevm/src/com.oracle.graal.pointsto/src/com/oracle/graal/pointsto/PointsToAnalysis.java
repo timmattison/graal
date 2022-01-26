@@ -607,6 +607,7 @@ public abstract class PointsToAnalysis implements BigBang {
         });
     }
 
+    @Override
     public void postTask(final DebugContextRunnable task) {
         executor.execute(task);
     }
@@ -629,8 +630,8 @@ public abstract class PointsToAnalysis implements BigBang {
     }
 
     @Override
-    public void markTypeReachable(AnalysisType type) {
-        type.registerAsReachable();
+    public boolean markTypeReachable(AnalysisType type) {
+        return type.registerAsReachable();
     }
 
     @Override
