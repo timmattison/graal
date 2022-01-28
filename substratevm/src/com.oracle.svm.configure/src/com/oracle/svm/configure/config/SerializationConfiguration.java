@@ -38,7 +38,7 @@ import org.graalvm.nativeimage.impl.RuntimeSerializationSupport;
 import com.oracle.svm.configure.ConfigurationBase;
 import com.oracle.svm.configure.json.JsonWriter;
 
-public final class SerializationConfiguration extends ConfigurationBase<SerializationConfiguration, SerializationConfiguration.SerializationConfigurationFilter>
+public final class SerializationConfiguration extends ConfigurationBase<SerializationConfiguration, SerializationConfiguration.Predicate>
                 implements RuntimeSerializationSupport {
 
     private final Set<SerializationConfigurationType> serializations = ConcurrentHashMap.newKeySet();
@@ -71,7 +71,7 @@ public final class SerializationConfiguration extends ConfigurationBase<Serializ
     }
 
     @Override
-    protected void filter(SerializationConfigurationFilter predicate) {
+    protected void removeIf(Predicate predicate) {
         serializations.removeIf(predicate::testSerializationType);
     }
 
@@ -133,7 +133,7 @@ public final class SerializationConfiguration extends ConfigurationBase<Serializ
         return new SerializationConfigurationType(condition, convertedClassName, convertedCustomTargetConstructorClassName);
     }
 
-    public interface SerializationConfigurationFilter {
+    public interface Predicate {
 
         boolean testSerializationType(SerializationConfigurationType type);
 
