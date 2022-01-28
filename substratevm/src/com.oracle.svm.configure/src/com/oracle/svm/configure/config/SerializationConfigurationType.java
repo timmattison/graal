@@ -51,6 +51,14 @@ public class SerializationConfigurationType implements JsonPrintable, Comparable
         this.qualifiedCustomTargetConstructorJavaName = qualifiedCustomTargetConstructorJavaName;
     }
 
+    public String getQualifiedJavaName() {
+        return qualifiedJavaName;
+    }
+
+    public String getQualifiedCustomTargetConstructorJavaName() {
+        return qualifiedCustomTargetConstructorJavaName;
+    }
+
     @Override
     public void printJson(JsonWriter writer) throws IOException {
         writer.append('{').indent().newline();

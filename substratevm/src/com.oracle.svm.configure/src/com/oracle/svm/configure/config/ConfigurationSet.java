@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2022, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -24,133 +24,132 @@
  */
 package com.oracle.svm.configure.config;
 
-import java.io.IOException;
-import java.net.URI;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.LinkedHashSet;
-import java.util.Set;
-import java.util.function.Function;
-import java.util.function.Predicate;
 
+import java.nio.file.Path;
+import java.util.function.BiFunction;
+
+import com.oracle.svm.configure.ConfigurationBase;
+import com.oracle.svm.configure.trace.TraceProcessor;
 import com.oracle.svm.core.configure.ConfigurationFile;
-import com.oracle.svm.core.configure.ConfigurationParser;
-import com.oracle.svm.core.configure.PredefinedClassesConfigurationParser;
-import com.oracle.svm.core.configure.ProxyConfigurationParser;
-import com.oracle.svm.core.configure.ReflectionConfigurationParser;
-import com.oracle.svm.core.configure.ResourceConfigurationParser;
-import com.oracle.svm.core.configure.SerializationConfigurationParser;
+import com.oracle.svm.core.util.VMError;
 
 public class ConfigurationSet {
-    public static final Function<IOException, Exception> FAIL_ON_EXCEPTION = e -> e;
 
-    private final Set<URI> jniConfigPaths = new LinkedHashSet<>();
-    private final Set<URI> reflectConfigPaths = new LinkedHashSet<>();
-    private final Set<URI> proxyConfigPaths = new LinkedHashSet<>();
-    private final Set<URI> resourceConfigPaths = new LinkedHashSet<>();
-    private final Set<URI> serializationConfigPaths = new LinkedHashSet<>();
-    private final Set<URI> predefinedClassesConfigPaths = new LinkedHashSet<>();
+    private final TypeConfiguration reflectionConfiguration;
+    private final TypeConfiguration jniConfiguration;
+    private final ResourceConfiguration resourceConfiguration;
+    private final ProxyConfiguration proxyConfiguration;
+    private final SerializationConfiguration serializationConfiguration;
+    private final PredefinedClassesConfiguration predefinedClassesConfiguration;
 
-    public void addDirectory(Path path) {
-        jniConfigPaths.add(path.resolve(ConfigurationFile.JNI.getFileName()).toUri());
-        reflectConfigPaths.add(path.resolve(ConfigurationFile.REFLECTION.getFileName()).toUri());
-        proxyConfigPaths.add(path.resolve(ConfigurationFile.DYNAMIC_PROXY.getFileName()).toUri());
-        resourceConfigPaths.add(path.resolve(ConfigurationFile.RESOURCES.getFileName()).toUri());
-        serializationConfigPaths.add(path.resolve(ConfigurationFile.SERIALIZATION.getFileName()).toUri());
-        predefinedClassesConfigPaths.add(path.resolve(ConfigurationFile.PREDEFINED_CLASSES_NAME.getFileName()).toUri());
+    private ConfigurationSet(TypeConfiguration reflectionConfiguration, TypeConfiguration jniConfiguration, ResourceConfiguration resourceConfiguration, ProxyConfiguration proxyConfiguration,
+                    SerializationConfiguration serializationConfiguration, PredefinedClassesConfiguration predefinedClassesConfiguration) {
+        this.reflectionConfiguration = reflectionConfiguration;
+        this.jniConfiguration = jniConfiguration;
+        this.resourceConfiguration = resourceConfiguration;
+        this.proxyConfiguration = proxyConfiguration;
+        this.serializationConfiguration = serializationConfiguration;
+        this.predefinedClassesConfiguration = predefinedClassesConfiguration;
     }
 
-    public void addDirectory(Function<String, URI> fileResolver) {
-        jniConfigPaths.add(fileResolver.apply(ConfigurationFile.JNI.getFileName()));
-        reflectConfigPaths.add(fileResolver.apply(ConfigurationFile.REFLECTION.getFileName()));
-        proxyConfigPaths.add(fileResolver.apply(ConfigurationFile.DYNAMIC_PROXY.getFileName()));
-        resourceConfigPaths.add(fileResolver.apply(ConfigurationFile.RESOURCES.getFileName()));
-        serializationConfigPaths.add(fileResolver.apply(ConfigurationFile.SERIALIZATION.getFileName()));
-        predefinedClassesConfigPaths.add(fileResolver.apply(ConfigurationFile.PREDEFINED_CLASSES_NAME.getFileName()));
+    public ConfigurationSet(TraceProcessor processor) {
+        this(processor.getReflectionConfiguration(), processor.getJniConfiguration(), processor.getResourceConfiguration(), processor.getProxyConfiguration(),
+                        processor.getSerializationConfiguration(), processor.getPredefinedClassesConfiguration());
     }
 
-    public boolean isEmpty() {
-        return jniConfigPaths.isEmpty() && reflectConfigPaths.isEmpty() && proxyConfigPaths.isEmpty() &&
-                        resourceConfigPaths.isEmpty() && serializationConfigPaths.isEmpty() && predefinedClassesConfigPaths.isEmpty();
+    public ConfigurationSet(ConfigurationSet other) {
+        this(new TypeConfiguration(other.reflectionConfiguration), new TypeConfiguration(other.jniConfiguration), new ResourceConfiguration(other.resourceConfiguration),
+                        new ProxyConfiguration(other.proxyConfiguration), new SerializationConfiguration(other.serializationConfiguration),
+                        new PredefinedClassesConfiguration(other.predefinedClassesConfiguration));
     }
 
-    public Set<URI> getJniConfigPaths() {
-        return jniConfigPaths;
+    public ConfigurationSet() {
+        this(new TypeConfiguration(), new TypeConfiguration(), new ResourceConfiguration(), new ProxyConfiguration(), new SerializationConfiguration(),
+                        new PredefinedClassesConfiguration(new Path[0], hash -> false));
     }
 
-    public Set<URI> getReflectConfigPaths() {
-        return reflectConfigPaths;
+    @SuppressWarnings("rawtypes")
+    private ConfigurationSet mutate(ConfigurationSet other, BiFunction<ConfigurationBase, ConfigurationBase, ConfigurationBase> mutator) {
+        TypeConfiguration reflectionConfiguration = (TypeConfiguration) mutator.apply(this.reflectionConfiguration, other.reflectionConfiguration);
+        TypeConfiguration jniConfiguration = (TypeConfiguration) mutator.apply(this.jniConfiguration, other.jniConfiguration);
+        ResourceConfiguration resourceConfiguration = (ResourceConfiguration) mutator.apply(this.resourceConfiguration, other.resourceConfiguration);
+        ProxyConfiguration proxyConfiguration = (ProxyConfiguration) mutator.apply(this.proxyConfiguration, other.proxyConfiguration);
+        SerializationConfiguration serializationConfiguration = (SerializationConfiguration) mutator.apply(this.serializationConfiguration, other.serializationConfiguration);
+        PredefinedClassesConfiguration predefinedClassesConfiguration = (PredefinedClassesConfiguration) mutator.apply(this.predefinedClassesConfiguration, other.predefinedClassesConfiguration);
+        return new ConfigurationSet(reflectionConfiguration, jniConfiguration, resourceConfiguration, proxyConfiguration, serializationConfiguration, predefinedClassesConfiguration);
     }
 
-    public Set<URI> getProxyConfigPaths() {
-        return proxyConfigPaths;
+    @SuppressWarnings("unchecked")
+    public ConfigurationSet merge(ConfigurationSet other) {
+        return mutate(other, ConfigurationBase::copyAndMerge);
     }
 
-    public Set<URI> getResourceConfigPaths() {
-        return resourceConfigPaths;
+    @SuppressWarnings("unchecked")
+    public ConfigurationSet subtract(ConfigurationSet other) {
+        return mutate(other, ConfigurationBase::copyAndSubtract);
     }
 
-    public Set<URI> getSerializationConfigPaths() {
-        return serializationConfigPaths;
+    @SuppressWarnings("unchecked")
+    public ConfigurationSet intersectWith(ConfigurationSet other) {
+        return mutate(other, ConfigurationBase::copyAndIntersect);
     }
 
-    public Set<URI> getPredefinedClassesConfigPaths() {
-        return predefinedClassesConfigPaths;
+    public ConfigurationSet filter(ConditionalConfigurationFilter filter) {
+        TypeConfiguration reflectionConfiguration = this.reflectionConfiguration.copyAndFilter(filter);
+        TypeConfiguration jniConfiguration = this.jniConfiguration.copyAndFilter(filter);
+        ResourceConfiguration resourceConfiguration = this.resourceConfiguration.copyAndFilter(filter);
+        ProxyConfiguration proxyConfiguration = this.proxyConfiguration.copyAndFilter(filter);
+        SerializationConfiguration serializationConfiguration = this.serializationConfiguration.copyAndFilter(filter);
+        PredefinedClassesConfiguration predefinedClassesConfiguration = this.predefinedClassesConfiguration.copyAndFilter(filter);
+        return new ConfigurationSet(reflectionConfiguration, jniConfiguration, resourceConfiguration, proxyConfiguration, serializationConfiguration, predefinedClassesConfiguration);
     }
 
-    public TypeConfiguration loadJniConfig(Function<IOException, Exception> exceptionHandler) throws Exception {
-        return loadTypeConfig(jniConfigPaths, exceptionHandler);
+    public TypeConfiguration getReflectionConfiguration() {
+        return reflectionConfiguration;
     }
 
-    public TypeConfiguration loadReflectConfig(Function<IOException, Exception> exceptionHandler) throws Exception {
-        return loadTypeConfig(reflectConfigPaths, exceptionHandler);
+    public TypeConfiguration getJniConfiguration() {
+        return jniConfiguration;
     }
 
-    public ProxyConfiguration loadProxyConfig(Function<IOException, Exception> exceptionHandler) throws Exception {
-        ProxyConfiguration proxyConfiguration = new ProxyConfiguration();
-        loadConfig(proxyConfigPaths, new ProxyConfigurationParser(types -> proxyConfiguration.add(types.getCondition(), new ArrayList<>(types.getElement())), true), exceptionHandler);
-        return proxyConfiguration;
-    }
-
-    public PredefinedClassesConfiguration loadPredefinedClassesConfig(Path[] classDestinationDirs, Predicate<String> shouldExcludeClassesWithHash,
-                    Function<IOException, Exception> exceptionHandler) throws Exception {
-        PredefinedClassesConfiguration predefinedClassesConfiguration = new PredefinedClassesConfiguration(classDestinationDirs, shouldExcludeClassesWithHash);
-        loadConfig(predefinedClassesConfigPaths, new PredefinedClassesConfigurationParser(predefinedClassesConfiguration::add, true), exceptionHandler);
-        return predefinedClassesConfiguration;
-    }
-
-    public ResourceConfiguration loadResourceConfig(Function<IOException, Exception> exceptionHandler) throws Exception {
-        ResourceConfiguration resourceConfiguration = new ResourceConfiguration();
-        loadConfig(resourceConfigPaths, new ResourceConfigurationParser(new ResourceConfiguration.ParserAdapter(resourceConfiguration), true), exceptionHandler);
+    public ResourceConfiguration getResourceConfiguration() {
         return resourceConfiguration;
     }
 
-    public SerializationConfiguration loadSerializationConfig(Function<IOException, Exception> exceptionHandler) throws Exception {
-        SerializationConfiguration serializationConfiguration = new SerializationConfiguration();
-        loadConfig(serializationConfigPaths, new SerializationConfigurationParser(serializationConfiguration, true), exceptionHandler);
+    public ProxyConfiguration getProxyConfiguration() {
+        return proxyConfiguration;
+    }
+
+    public SerializationConfiguration getSerializationConfiguration() {
         return serializationConfiguration;
     }
 
-    private static TypeConfiguration loadTypeConfig(Collection<URI> uris, Function<IOException, Exception> exceptionHandler) throws Exception {
-        TypeConfiguration configuration = new TypeConfiguration();
-        loadConfig(uris, new ReflectionConfigurationParser<>(new ParserConfigurationAdapter(configuration)), exceptionHandler);
-        return configuration;
+    public PredefinedClassesConfiguration getPredefinedClassesConfiguration() {
+        return predefinedClassesConfiguration;
     }
 
-    private static void loadConfig(Collection<URI> configPaths, ConfigurationParser configurationParser, Function<IOException, Exception> exceptionHandler) throws Exception {
-        for (URI uri : configPaths) {
-            try {
-                configurationParser.parseAndRegister(uri);
-            } catch (IOException ioe) {
-                Exception e = ioe;
-                if (exceptionHandler != null) {
-                    e = exceptionHandler.apply(ioe);
-                }
-                if (e != null) {
-                    throw e;
-                }
-            }
+    public ConfigurationBase<?, ?> getConfiguration(ConfigurationFile configurationFile) {
+        switch (configurationFile) {
+            case DYNAMIC_PROXY:
+                return proxyConfiguration;
+            case RESOURCES:
+                return resourceConfiguration;
+            case JNI:
+                return jniConfiguration;
+            case REFLECTION:
+                return reflectionConfiguration;
+            case SERIALIZATION:
+                return serializationConfiguration;
+            case PREDEFINED_CLASSES_NAME:
+                return predefinedClassesConfiguration;
+            default:
+                throw VMError.shouldNotReachHere("Unsupported configuration in configuration container: " + configurationFile);
         }
     }
+
+    public boolean isEmpty() {
+        return reflectionConfiguration.isEmpty() && jniConfiguration.isEmpty() && resourceConfiguration.isEmpty() && proxyConfiguration.isEmpty() && serializationConfiguration.isEmpty() &&
+                        predefinedClassesConfiguration.isEmpty();
+    }
+
 }

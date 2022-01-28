@@ -38,7 +38,8 @@ import org.graalvm.nativeimage.impl.RuntimeSerializationSupport;
 import com.oracle.svm.configure.ConfigurationBase;
 import com.oracle.svm.configure.json.JsonWriter;
 
-public class SerializationConfiguration implements ConfigurationBase, RuntimeSerializationSupport {
+public final class SerializationConfiguration extends ConfigurationBase<SerializationConfiguration, SerializationConfiguration.SerializationConfigurationFilter>
+                implements RuntimeSerializationSupport {
 
     private final Set<SerializationConfigurationType> serializations = ConcurrentHashMap.newKeySet();
 
@@ -49,8 +50,35 @@ public class SerializationConfiguration implements ConfigurationBase, RuntimeSer
         serializations.addAll(other.serializations);
     }
 
-    public void removeAll(SerializationConfiguration other) {
+    @Override
+    public SerializationConfiguration copy() {
+        return new SerializationConfiguration(this);
+    }
+
+    @Override
+    protected void merge(SerializationConfiguration other) {
+        serializations.addAll(other.serializations);
+    }
+
+    @Override
+    public void subtract(SerializationConfiguration other) {
         serializations.removeAll(other.serializations);
+    }
+
+    @Override
+    protected void intersect(SerializationConfiguration other) {
+        serializations.retainAll(other.serializations);
+    }
+
+    @Override
+    protected void filter(SerializationConfigurationFilter predicate) {
+        serializations.removeIf(predicate::testSerializationType);
+    }
+
+    public void addWithCondition(ConfigurationCondition condition, SerializationConfiguration other) {
+        for (SerializationConfigurationType type : other.serializations) {
+            serializations.add(new SerializationConfigurationType(condition, type.getQualifiedJavaName(), type.getQualifiedCustomTargetConstructorJavaName()));
+        }
     }
 
     public boolean contains(ConfigurationCondition condition, String serializationTargetClass, String customTargetConstructorClass) {
@@ -103,5 +131,11 @@ public class SerializationConfiguration implements ConfigurationBase, RuntimeSer
         String convertedClassName = SignatureUtil.toInternalClassName(className);
         String convertedCustomTargetConstructorClassName = customTargetConstructorClassName == null ? null : SignatureUtil.toInternalClassName(customTargetConstructorClassName);
         return new SerializationConfigurationType(condition, convertedClassName, convertedCustomTargetConstructorClassName);
+    }
+
+    public interface SerializationConfigurationFilter {
+
+        boolean testSerializationType(SerializationConfigurationType type);
+
     }
 }
