@@ -38,8 +38,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -239,6 +241,7 @@ public class ConfigurationTool {
                     break;
             }
         }
+        failIfAgentLockFilesPresent(inputSet, omittedInputSet, outputSet);
 
         RuleNode callersFilter = null;
         if (!builtinCallerFilter) {
@@ -329,6 +332,24 @@ public class ConfigurationTool {
             try (JsonWriter writer = new JsonWriter(Paths.get(uri))) {
                 p.getPredefinedClassesConfiguration().printJson(writer);
             }
+        }
+    }
+
+    private static void failIfAgentLockFilesPresent(ConfigurationSet... sets) {
+        Set<String> paths = null;
+        for (ConfigurationSet set : sets) {
+            for (URI path : set.getDetectedAgentLockPaths()) {
+                if (paths == null) {
+                    paths = new HashSet<>();
+                }
+                paths.add(path.toString());
+            }
+        }
+        if (paths != null && !paths.isEmpty()) {
+            throw new UsageException("The following agent lock files were found in specified configuration directories, which means an agent is currently writing to them. " +
+                            "The agent must finish execution before its configuration can be safely accessed. " +
+                            "Unless a lock file is a leftover from an earlier process that terminated abruptly, it is unsafe to delete it." + System.lineSeparator() +
+                            String.join(System.lineSeparator(), paths));
         }
     }
 
