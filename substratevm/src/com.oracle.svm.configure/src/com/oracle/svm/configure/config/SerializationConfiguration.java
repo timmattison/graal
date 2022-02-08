@@ -75,7 +75,8 @@ public final class SerializationConfiguration extends ConfigurationBase<Serializ
         serializations.removeIf(predicate::testSerializationType);
     }
 
-    public void addWithCondition(ConfigurationCondition condition, SerializationConfiguration other) {
+    @Override
+    public void mergeConditional(ConfigurationCondition condition, SerializationConfiguration other) {
         for (SerializationConfigurationType type : other.serializations) {
             serializations.add(new SerializationConfigurationType(condition, type.getQualifiedJavaName(), type.getQualifiedCustomTargetConstructorJavaName()));
         }
