@@ -134,6 +134,7 @@ public class SubstrateDiagnostics {
         }
     }
 
+    @Uninterruptible(reason = "Called with a raw object pointer.", calleeMustBe = false)
     public static void printObjectInfo(Log log, Pointer ptr) {
         DynamicHub objHub = Heap.getHeap().getObjectHeader().readDynamicHubFromPointer(ptr);
         if (objHub == SubstrateUtil.cast(DynamicHub.class, DynamicHub.class)) {
@@ -142,7 +143,7 @@ public class SubstrateDiagnostics {
             log.string("is the hub of ").string(hub.getName());
         } else {
             // The pointer is an object, so print some information about the object's hub.
-            log.string("is an object with hub=").string(objHub.getName());
+            log.string("is an object of type ").string(objHub.getName());
         }
     }
 
